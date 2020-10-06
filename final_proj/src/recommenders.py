@@ -28,29 +28,23 @@ class MainRecommender:
     def __init__(self, data, top_popular, item_features, item_mean_cost, popular_exp_item, weighting=True):
                 
         # Топ покупок каждого юзера
-        print('Топ покупок каждого юзера')
         self.top_popular = top_popular
         self.item_features = item_features
         self.item_mean_cost = item_mean_cost
         self.popular_exp_item = popular_exp_item
         
-        print('Matrix')
         self.user_item_matrix = self.prepare_matrix(data)  # pd.DataFrame
         self.id_to_itemid, self.id_to_userid, self.itemid_to_id, self.userid_to_id = self.prepare_dicts(self.user_item_matrix)
         
         
-        # Own recommender обучается до взвешивания матрицы
-        print('Own recommender обучается до взвешивания матрицы')
-        self.own_recommender = self.fit_own_recommender(self.user_item_matrix)
-        
         if weighting:
-            print('bm25_weight')
-            self.user_item_matrix = bm25_weight(self.user_item_matrix.T).T 
+            self.user_item_matrix = bm25_weight(self.user_item_matrix.T, K1=12,B=0.165).T 
         
-        print('Model')
         self.model = self.fit(self.user_item_matrix)
+        
+        self.own_recommender = self.fit_own_recommender(self.user_item_matrix)
      
-        self.all_recommendations = self.get_all_recommendations(self.model,self.user_item_matrix, N=200)
+        self.all_recommendations = self.get_all_recommendations(self.model,N=200)
         
     @staticmethod
     def prepare_matrix(data):
@@ -88,7 +82,7 @@ class MainRecommender:
     def fit_own_recommender(user_item_matrix):
         """Обучает модель, которая рекомендует товары, среди товаров, купленных юзером"""
     
-        own_recommender = ItemItemRecommender(K=1, num_threads=4)
+        own_recommender = ItemItemRecommender(K=1, num_threads=8)
         own_recommender.fit(csr_matrix(user_item_matrix).T.tocsr(),show_progress=True)
                     
         return own_recommender
@@ -96,7 +90,7 @@ class MainRecommender:
     @staticmethod
     def fit(user_item_matrix, n_factors=20, regularization=0.001, iterations=15, num_threads=4):
         """Обучает ALS"""
-        
+               
         model = AlternatingLeastSquares(factors=7, 
                                 regularization=0.001,
                                 iterations=15, 
@@ -107,12 +101,11 @@ class MainRecommender:
         return model      
        
 
-    @staticmethod
-    def get_all_recommendations(model, user_item_matrix, N=200):
+    def get_all_recommendations(self, model, N=200):
         recommendations = model.recommend_all(N=N, 
-                                              user_items=csr_matrix(user_item_matrix).tocsr(),
+                                              user_items=csr_matrix(self.user_item_matrix).tocsr(),
                                               filter_already_liked_items=True, 
-                                              filter_items=False, #[itemid_to_id[999999]]
+                                              filter_items=False, 
                                               recalculate_user=True,
                                               show_progress=True,
                                               batch_size=500)
@@ -126,7 +119,7 @@ class MainRecommender:
                                             user_items=csr_matrix(self.user_item_matrix).tocsr(),   # на вход user-item matrix
                                             N=N, 
                                             filter_already_liked_items=False, 
-                                            filter_items=False,  # [itemid_to_id[999999]]
+                                            filter_items=False,  
                                             recalculate_user=False)]
         return res
         
@@ -134,4 +127,3 @@ class MainRecommender:
         res = [self.item_mean_cost.loc[self.item_mean_cost['item_id']==pr,'mean_price'].values[0] for pr in recommendations]
         return res
         
-      
