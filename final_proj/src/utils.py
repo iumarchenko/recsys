@@ -4,9 +4,10 @@ def prefilter_items(data, take_n_popular, item_mean_cost):
 #     """Предфильтрация товаров"""  
      
     # 4. Выбор топ-N самых популярных товаров (N = take_n_popular)  
+    # 0.176 важно запустить до обрезки цены
     popularity = data.groupby('item_id')['quantity'].sum().reset_index()
     popularity.sort_values('quantity', ascending=False, inplace=True)
-    top_popular = popularity.head(20).item_id.tolist()
+    top_popular = popularity.head(40).item_id.tolist()
     data = data[~data['item_id'].isin(top_popular)]
     print(data['item_id'].nunique())
     
@@ -15,18 +16,24 @@ def prefilter_items(data, take_n_popular, item_mean_cost):
     data = data[~data['item_id'].isin(top_notpopular)]
     print(data['item_id'].nunique())
     
+
     # 1. Удаление товаров, со средней ценой < 2$
-    data = data[data['sales_value'] / data['quantity'] > 1.3]
+    data = data[data['sales_value'] / data['quantity'] > 0.5]
+    print(data['item_id'].nunique())
+    
+    data = data[data['sales_value'] / data['quantity'] < 70]
     print(data['item_id'].nunique())
     
     purchases_last_week = data.groupby('item_id')['week_no'].max().reset_index()
     weeks = purchases_last_week[
-        purchases_last_week['week_no'] > data['week_no'].max() - 3].item_id.tolist()
+        purchases_last_week['week_no'] > data['week_no'].max() - 4].item_id.tolist()
     data = data[data['item_id'].isin(weeks)]
     print(data['item_id'].nunique())
-    
+
+
 
     return data, top_popular
+
 
 
 def postfilter_items(user, data, data1, item_features, col, N, item_mean_cost, all_rec, top,userid_to_id,id_to_itemid,popular_exp_item):
